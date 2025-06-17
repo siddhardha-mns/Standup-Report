@@ -139,15 +139,30 @@ with st.expander("🔐 Admin Panel (Restricted)", expanded=False):
     admin_input = st.text_input("Enter Admin Password", type="password")
     if admin_input == ADMIN_PASSWORD:
         st.success("🛡️ Access granted.")
+
         csv_data = reports_df.to_csv(index=False)
         st.download_button(
-            label="📥 Download CSV",
+            label="📥 Download All Reports as CSV",
             data=csv_data,
             file_name=f"standup_reports_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
+
+        st.markdown("### ⚠️ Clear All Reports")
+        if st.button("🗑️ Clear All Reports", type="secondary"):
+            try:
+                # Reinitialize the CSV with just headers
+                with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(['Timestamp', 'GitLab Username', 'Standup Report'])
+                st.success("✅ All reports have been cleared.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Failed to clear reports: {e}")
+
     elif admin_input != "":
         st.error("❌ Incorrect password.")
+
 
 # -----------------------------
 # FOOTER
