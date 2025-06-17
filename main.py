@@ -168,4 +168,4 @@ with st.expander("🔐 Admin Panel (Restricted)", expanded=False):
 # FOOTER
 # -----------------------------
 st.markdown("---")
-st.markdown("**Matrusri Engineering Team** | Built with ❤️ using Streamlit")
+st.markdown("**From a MECS TechLead** | Built with ❤️ using Streamlit")
