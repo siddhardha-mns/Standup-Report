@@ -31,12 +31,13 @@ def load_reports():
         # Handle backward compatibility - add Date column if it doesn't exist
         if 'Date' not in df.columns:
             try:
-                df['Date'] = pd.to_datetime(df['Timestamp']).dt.date
+                # Extract date from timestamp and store as string
+                df['Date'] = pd.to_datetime(df['Timestamp']).dt.strftime('%Y-%m-%d')
                 # Save the updated CSV with Date column
                 df.to_csv(CSV_FILE, index=False)
             except Exception as e:
                 # If timestamp parsing fails, use today's date as fallback
-                df['Date'] = datetime.now().date()
+                df['Date'] = datetime.now().strftime('%Y-%m-%d')
                 df.to_csv(CSV_FILE, index=False)
         return df
     return pd.DataFrame(columns=['Timestamp', 'Date', 'GitLab Username', 'Standup Report'])
@@ -48,39 +49,35 @@ def has_submitted_today(username):
         if reports_df.empty:
             return False
         
-        today = datetime.now().date()
+        today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # Safely convert Date column to date objects for comparison
-        def safe_date_convert(date_val):
-            try:
-                if pd.isna(date_val):
-                    return None
-                # If it's already a date object, return it
-                if isinstance(date_val, datetime.date):
-                    return date_val
-                # Try to parse as datetime then extract date
-                return pd.to_datetime(str(date_val)).date()
-            except:
-                return None
+        # Debug: Show what we're checking
+        st.write(f"DEBUG: Checking for user '{username}' on date '{today_str}'")
+        st.write(f"DEBUG: Total reports in system: {len(reports_df)}")
         
-        reports_df['Date_parsed'] = reports_df['Date'].apply(safe_date_convert)
-        
-        # Check if user has submitted today
-        user_today = reports_df[
-            (reports_df['GitLab Username'].str.lower() == username.lower()) & 
-            (reports_df['Date_parsed'] == today)
+        # Filter for this user and today
+        user_reports_today = reports_df[
+            (reports_df['GitLab Username'].str.strip().str.lower() == username.lower()) & 
+            (reports_df['Date'].astype(str).str.contains(today_str))
         ]
         
-        return not user_today.empty
+        st.write(f"DEBUG: Found {len(user_reports_today)} reports for {username} today")
+        if not user_reports_today.empty:
+            st.write("DEBUG: Existing reports:")
+            for _, row in user_reports_today.iterrows():
+                st.write(f"  - {row['GitLab Username']} on {row['Date']} at {row['Timestamp']}")
+        
+        return not user_reports_today.empty
+        
     except Exception as e:
+        st.error(f"Error checking submissions: {e}")
         # If there's any error, allow submission (fail safe)
-        st.warning(f"Warning: Could not check previous submissions. Proceeding with submission.")
         return False
 
 def save_report(username, report):
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        date = datetime.now().date()
+        date = datetime.now().strftime("%Y-%m-%d")  # Store as string for consistency
         
         with open(CSV_FILE, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
