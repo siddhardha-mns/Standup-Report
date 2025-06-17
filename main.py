@@ -30,29 +30,52 @@ def load_reports():
         df = pd.read_csv(CSV_FILE)
         # Handle backward compatibility - add Date column if it doesn't exist
         if 'Date' not in df.columns:
-            df['Date'] = pd.to_datetime(df['Timestamp']).dt.date
-            # Save the updated CSV with Date column
-            df.to_csv(CSV_FILE, index=False)
+            try:
+                df['Date'] = pd.to_datetime(df['Timestamp']).dt.date
+                # Save the updated CSV with Date column
+                df.to_csv(CSV_FILE, index=False)
+            except Exception as e:
+                # If timestamp parsing fails, use today's date as fallback
+                df['Date'] = datetime.now().date()
+                df.to_csv(CSV_FILE, index=False)
         return df
     return pd.DataFrame(columns=['Timestamp', 'Date', 'GitLab Username', 'Standup Report'])
 
 def has_submitted_today(username):
     """Check if username has already submitted a report today"""
-    reports_df = load_reports()
-    if reports_df.empty:
+    try:
+        reports_df = load_reports()
+        if reports_df.empty:
+            return False
+        
+        today = datetime.now().date()
+        
+        # Safely convert Date column to date objects for comparison
+        def safe_date_convert(date_val):
+            try:
+                if pd.isna(date_val):
+                    return None
+                # If it's already a date object, return it
+                if isinstance(date_val, datetime.date):
+                    return date_val
+                # Try to parse as datetime then extract date
+                return pd.to_datetime(str(date_val)).date()
+            except:
+                return None
+        
+        reports_df['Date_parsed'] = reports_df['Date'].apply(safe_date_convert)
+        
+        # Check if user has submitted today
+        user_today = reports_df[
+            (reports_df['GitLab Username'].str.lower() == username.lower()) & 
+            (reports_df['Date_parsed'] == today)
+        ]
+        
+        return not user_today.empty
+    except Exception as e:
+        # If there's any error, allow submission (fail safe)
+        st.warning(f"Warning: Could not check previous submissions. Proceeding with submission.")
         return False
-    
-    today = datetime.now().date()
-    # Convert Date column to date objects for comparison
-    reports_df['Date'] = pd.to_datetime(reports_df['Date']).dt.date
-    
-    # Check if user has submitted today
-    user_today = reports_df[
-        (reports_df['GitLab Username'].str.lower() == username.lower()) & 
-        (reports_df['Date'] == today)
-    ]
-    
-    return not user_today.empty
 
 def save_report(username, report):
     try:
@@ -198,17 +221,30 @@ with st.expander("🔐 Admin Panel (Restricted)", expanded=False):
 
         st.markdown("### 📊 Daily Submission Stats")
         if not reports_df.empty:
-            # Convert Date column for stats
-            reports_df['Date'] = pd.to_datetime(reports_df['Date']).dt.date
-            today = datetime.now().date()
-            
-            today_reports = reports_df[reports_df['Date'] == today]
-            st.metric("Reports Submitted Today", len(today_reports))
-            
-            if not today_reports.empty:
-                st.markdown("**Today's Submissions:**")
-                for _, row in today_reports.iterrows():
-                    st.write(f"- {row['GitLab Username']} at {row['Timestamp']}")
+            try:
+                # Safely convert Date column for stats
+                def safe_date_convert(date_val):
+                    try:
+                        if pd.isna(date_val):
+                            return None
+                        if isinstance(date_val, datetime.date):
+                            return date_val
+                        return pd.to_datetime(str(date_val)).date()
+                    except:
+                        return None
+                
+                reports_df['Date_parsed'] = reports_df['Date'].apply(safe_date_convert)
+                today = datetime.now().date()
+                
+                today_reports = reports_df[reports_df['Date_parsed'] == today]
+                st.metric("Reports Submitted Today", len(today_reports))
+                
+                if not today_reports.empty:
+                    st.markdown("**Today's Submissions:**")
+                    for _, row in today_reports.iterrows():
+                        st.write(f"- {row['GitLab Username']} at {row['Timestamp']}")
+            except Exception as e:
+                st.warning("Could not load daily stats due to date parsing issues.")
 
         st.markdown("### ⚠️ Clear All Reports")
         if st.button("🗑️ Clear All Reports", type="secondary"):
