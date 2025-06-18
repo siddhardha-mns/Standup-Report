@@ -14,6 +14,8 @@ A lightweight Streamlit web app for developer interns at **Matrusri** to submit 
   * 🗑️ Clear all report history with one click
 * 📁 Stores data locally in a CSV file (no database required)
 * 💡 Built using [Streamlit](https://streamlit.io)
+* 📝 Admins can add comments to each report (visible to all)
+* ❓ Interns can submit doubts/queries (visible only to techeads/admins)
 
 ---
 
@@ -96,6 +98,18 @@ admin_password = "your_secure_admin_password"
 ## 📄 License
 
 This project is licensed under the **Matrusri Academic Team (MAT) License**. Redistribution or modification is permitted **only** within Matrusri-affiliated projects or by authorized contributors. For more details, refer to the `LICENSE` file in this repository.
+
+---
+
+## 🚀 Usage
+
+### Standup Reports
+- Interns submit daily standup reports (one per day)
+- Admins can add comments to any report via the Admin Panel (comments are visible to all)
+
+### Doubts/Queries
+- Interns can submit doubts/queries with their name and phone number on the new "doubts" page
+- Only techeads/admins (with the admin password) can view all submitted doubts
 
 ---
 

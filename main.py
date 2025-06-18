@@ -9,11 +9,13 @@ import os
 # -----------------------------
 st.set_page_config(
     page_title="Matrusri Daily Standup Reports",
-    page_icon="📝",
-    layout="wide"
+    page_icon="��",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 CSV_FILE = "standup_reports.csv"
+DOUBTS_FILE = "doubts.csv"
 ADMIN_PASSWORD = st.secrets.get("admin_password", "")
 
 # -----------------------------
@@ -23,24 +25,35 @@ def init_csv():
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(['Timestamp', 'Date', 'GitLab Username', 'Standup Report'])
+            writer.writerow(['Timestamp', 'Date', 'GitLab Username', 'Standup Report', 'Comment'])
+    else:
+        # Add Comment column if missing
+        df = pd.read_csv(CSV_FILE)
+        if 'Comment' not in df.columns:
+            df['Comment'] = ''
+            df.to_csv(CSV_FILE, index=False)
+    # Doubts file
+    if not os.path.exists(DOUBTS_FILE):
+        with open(DOUBTS_FILE, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Timestamp', 'Name', 'Phone', 'Doubt'])
 
 def load_reports():
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
-        # Handle backward compatibility - add Date column if it doesn't exist
+        # Handle backward compatibility - add Date/Comment column if missing
         if 'Date' not in df.columns:
             try:
-                # Extract date from timestamp and store as string
                 df['Date'] = pd.to_datetime(df['Timestamp']).dt.strftime('%Y-%m-%d')
-                # Save the updated CSV with Date column
                 df.to_csv(CSV_FILE, index=False)
             except Exception as e:
-                # If timestamp parsing fails, use today's date as fallback
                 df['Date'] = datetime.now().strftime('%Y-%m-%d')
                 df.to_csv(CSV_FILE, index=False)
+        if 'Comment' not in df.columns:
+            df['Comment'] = ''
+            df.to_csv(CSV_FILE, index=False)
         return df
-    return pd.DataFrame(columns=['Timestamp', 'Date', 'GitLab Username', 'Standup Report'])
+    return pd.DataFrame(columns=['Timestamp', 'Date', 'GitLab Username', 'Standup Report', 'Comment'])
 
 def has_submitted_today(username):
     """Check if username has already submitted a report today"""
@@ -77,14 +90,23 @@ def has_submitted_today(username):
 def save_report(username, report):
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        date = datetime.now().strftime("%Y-%m-%d")  # Store as string for consistency
-        
+        date = datetime.now().strftime("%Y-%m-%d")
         with open(CSV_FILE, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow([timestamp, date, username, report])
+            writer.writerow([timestamp, date, username, report, ''])
         return True
     except Exception as e:
         st.error(f"Error saving report: {e}")
+        return False
+
+def save_comment(timestamp, comment):
+    try:
+        df = pd.read_csv(CSV_FILE)
+        df.loc[df['Timestamp'] == timestamp, 'Comment'] = comment
+        df.to_csv(CSV_FILE, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving comment: {e}")
         return False
 
 # -----------------------------
@@ -196,6 +218,8 @@ if not reports_df.empty:
             with c2:
                 st.markdown("**Report:**")
                 st.write(row['Standup Report'])
+                if row.get('Comment', ''):
+                    st.markdown(f"**Admin Comment:** {row['Comment']}")
         st.markdown("---")
 else:
     st.info("📭 No reports submitted yet.")
@@ -243,13 +267,24 @@ with st.expander("🔐 Admin Panel (Restricted)", expanded=False):
             except Exception as e:
                 st.warning("Could not load daily stats due to date parsing issues.")
 
+        st.markdown("### 📝 Add/Edit Comments to Reports")
+        if not reports_df.empty:
+            for idx, row in reports_df.iterrows():
+                with st.expander(f"{row['GitLab Username']} at {row['Timestamp']}"):
+                    st.write(row['Standup Report'])
+                    comment = st.text_area(f"Admin Comment for {row['GitLab Username']} ({row['Timestamp']})", value=row.get('Comment', ''), key=f"comment_{row['Timestamp']}")
+                    if st.button(f"Save Comment {row['Timestamp']}"):
+                        if save_comment(row['Timestamp'], comment):
+                            st.success("Comment saved!")
+                            st.rerun()
+
         st.markdown("### ⚠️ Clear All Reports")
         if st.button("🗑️ Clear All Reports", type="secondary"):
             try:
                 # Reinitialize the CSV with just headers (including Date column)
                 with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
                     writer = csv.writer(file)
-                    writer.writerow(['Timestamp', 'Date', 'GitLab Username', 'Standup Report'])
+                    writer.writerow(['Timestamp', 'Date', 'GitLab Username', 'Standup Report', 'Comment'])
                 st.success("✅ All reports have been cleared.")
                 st.rerun()
             except Exception as e:
