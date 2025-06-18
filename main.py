@@ -121,6 +121,19 @@ st.title("📝 Matrusri Daily Standup Reports")
 st.markdown("---")
 
 # -----------------------------
+# SIDEBAR (Custom)
+# -----------------------------
+st.sidebar.markdown("""
+# 📝 **Standup App**
+---
+**Navigate:**
+- 📝 **Standup Reports** (Home)
+- ❓ **Intern Doubts** (Sidebar → Intern Doubts & Queries)
+
+---
+""")
+
+# -----------------------------
 # INSTRUCTIONS
 # -----------------------------
 with st.expander("📋 Instructions for First-Time Users", expanded=False):
