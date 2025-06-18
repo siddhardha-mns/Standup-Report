@@ -6,7 +6,17 @@ import os
 
 DOUBTS_FILE = "doubts.csv"
 RESOLVED_DOUBTS_FILE = "resolved_doubts.csv"
+ASSIGNMENTS_FILE = "assignments.csv"
+TECHLEADS = [
+    {"name": "srikar", "secret": "techlead_srikar_pw"},
+    {"name": "hasini", "secret": "techlead_hasini_pw"},
+    {"name": "shiva", "secret": "techlead_shiva_pw"},
+    {"name": "puneeth", "secret": "techlead_puneeth_pw"},
+    {"name": "satwik", "secret": "techlead_satwik_pw"},
+    {"name": "kartik", "secret": "techlead_kartik_pw"},
+]
 ADMIN_PASSWORD = st.secrets.get("admin_password", "")
+ADMIN_TASK_PASSWORD = st.secrets.get("admin_task_password", "")
 
 # Initialize doubts CSV if not exists
 def init_doubts_csv():
@@ -58,7 +68,30 @@ def resolve_doubt(timestamp):
         st.error(f"Error resolving doubt: {e}")
         return False
 
+def init_assignments_csv():
+    if not os.path.exists(ASSIGNMENTS_FILE):
+        with open(ASSIGNMENTS_FILE, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Timestamp', 'Assigned By', 'TechLead', 'Task'])
+
+def save_assignment(admin, techlead, task):
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(ASSIGNMENTS_FILE, 'a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow([timestamp, admin, techlead, task])
+        return True
+    except Exception as e:
+        st.error(f"Error saving assignment: {e}")
+        return False
+
+def load_assignments():
+    if os.path.exists(ASSIGNMENTS_FILE):
+        return pd.read_csv(ASSIGNMENTS_FILE)
+    return pd.DataFrame(columns=['Timestamp', 'Assigned By', 'TechLead', 'Task'])
+
 init_doubts_csv()
+init_assignments_csv()
 
 st.set_page_config(
     page_title="Intern Doubts - Matrusri",
@@ -135,6 +168,52 @@ with st.expander("🔐 TechLead/Techead Panel (Restricted)", expanded=False):
         else:
             st.info("No doubts have been marked as resolved yet.")
     elif admin_input != "":
+        st.error("❌ Incorrect password.")
+
+st.markdown("---")
+
+with st.expander("🛡️ Admin Task Assignment Panel (Separate Password)", expanded=False):
+    admin_task_input = st.text_input("Enter Admin Task Password", type="password", key="admin_task_pw")
+    if admin_task_input == ADMIN_TASK_PASSWORD:
+        st.success("Admin access granted. Assign tasks to TechLeads.")
+        techlead_names = [t["name"] for t in TECHLEADS]
+        task = st.text_area("Task to assign", key="assign_task")
+        techlead = st.selectbox("Assign to TechLead", techlead_names, key="assign_techlead")
+        if st.button("Assign Task"):
+            if task.strip():
+                if save_assignment("admin", techlead, task.strip()):
+                    st.success(f"Task assigned to {techlead}!")
+            else:
+                st.error("Please enter a task.")
+        st.markdown("---")
+        st.markdown("### All Assignments")
+        assignments_df = load_assignments()
+        if not assignments_df.empty:
+            for _, row in assignments_df.sort_values('Timestamp', ascending=False).iterrows():
+                st.write(f"[{row['Timestamp']}] {row['TechLead']}: {row['Task']}")
+        else:
+            st.info("No assignments yet.")
+    elif admin_task_input != "":
+        st.error("❌ Incorrect password.")
+
+with st.expander("👨‍💻 TechLead Task Panel (Individual Login)", expanded=False):
+    techlead_user = st.selectbox("Select TechLead", [t["name"] for t in TECHLEADS], key="techlead_user")
+    techlead_pw = st.text_input("Enter TechLead Password", type="password", key="techlead_pw")
+    # Get the correct password from secrets
+    correct_pw = st.secrets.get(f"techlead_{techlead_user}_pw", "")
+    if techlead_pw == correct_pw and techlead_pw != "":
+        st.success(f"Welcome, {techlead_user}! Here are your assigned tasks:")
+        assignments_df = load_assignments()
+        if not assignments_df.empty:
+            my_tasks = assignments_df[assignments_df['TechLead'] == techlead_user]
+            if not my_tasks.empty:
+                for _, row in my_tasks.sort_values('Timestamp', ascending=False).iterrows():
+                    st.write(f"[{row['Timestamp']}] {row['Task']}")
+            else:
+                st.info("No tasks assigned to you yet.")
+        else:
+            st.info("No assignments yet.")
+    elif techlead_pw != "":
         st.error("❌ Incorrect password.")
 
 st.markdown("---")
