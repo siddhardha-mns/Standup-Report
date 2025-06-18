@@ -122,6 +122,16 @@ with st.expander("🔐 TechLead/Techead Panel (Restricted)", expanded=False):
                 file_name=f"resolved_doubts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
+            # Clear all resolved doubts button
+            if st.button("🗑️ Clear All Resolved Doubts"):
+                try:
+                    with open(RESOLVED_DOUBTS_FILE, 'w', newline='', encoding='utf-8') as file:
+                        writer = csv.writer(file)
+                        writer.writerow(['Timestamp', 'Name', 'Phone', 'Doubt'])
+                    st.success("All resolved doubts have been cleared.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to clear resolved doubts: {e}")
         else:
             st.info("No doubts have been marked as resolved yet.")
     elif admin_input != "":
