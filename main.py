@@ -30,7 +30,7 @@ def init_csv():
         # Add Comment column if missing
         df = pd.read_csv(CSV_FILE)
         if 'Comment' not in df.columns:
-            df['Comment'] = ''
+            df['Comment'] = 'Check back later to view comment ?'
             df.to_csv(CSV_FILE, index=False)
     # Doubts file
     if not os.path.exists(DOUBTS_FILE):
@@ -50,7 +50,7 @@ def load_reports():
                 df['Date'] = datetime.now().strftime('%Y-%m-%d')
                 df.to_csv(CSV_FILE, index=False)
         if 'Comment' not in df.columns:
-            df['Comment'] = ''
+            df['Comment'] = 'Check back later to view admins reply'
             df.to_csv(CSV_FILE, index=False)
         return df
     return pd.DataFrame(columns=['Timestamp', 'Date', 'GitLab Username', 'Standup Report', 'Comment'])
@@ -93,7 +93,7 @@ def save_report(username, report):
         date = datetime.now().strftime("%Y-%m-%d")
         with open(CSV_FILE, 'a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow([timestamp, date, username, report, ''])
+            writer.writerow([timestamp, date, username, report, 'Check back later to view comment ?'])
         return True
     except Exception as e:
         st.error(f"Error saving report: {e}")
