@@ -102,7 +102,7 @@ with st.expander("🔐 TechLead/Techead Panel (Restricted)", expanded=False):
                     if st.button(f"✅ Mark as Resolved", key=f"resolve_{row['Timestamp']}"):
                         if resolve_doubt(row['Timestamp']):
                             st.success("Doubt marked as resolved!")
-                            st.experimental_rerun()
+                            st.rerun()
                 st.markdown("---")
         else:
             st.info("No active doubts submitted yet.")
