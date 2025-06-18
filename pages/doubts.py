@@ -5,12 +5,17 @@ from datetime import datetime
 import os
 
 DOUBTS_FILE = "doubts.csv"
+RESOLVED_DOUBTS_FILE = "resolved_doubts.csv"
 ADMIN_PASSWORD = st.secrets.get("admin_password", "")
 
 # Initialize doubts CSV if not exists
 def init_doubts_csv():
     if not os.path.exists(DOUBTS_FILE):
         with open(DOUBTS_FILE, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Timestamp', 'Name', 'Phone', 'Doubt'])
+    if not os.path.exists(RESOLVED_DOUBTS_FILE):
+        with open(RESOLVED_DOUBTS_FILE, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(['Timestamp', 'Name', 'Phone', 'Doubt'])
 
@@ -29,6 +34,29 @@ def load_doubts():
     if os.path.exists(DOUBTS_FILE):
         return pd.read_csv(DOUBTS_FILE)
     return pd.DataFrame(columns=['Timestamp', 'Name', 'Phone', 'Doubt'])
+
+def load_resolved_doubts():
+    if os.path.exists(RESOLVED_DOUBTS_FILE):
+        return pd.read_csv(RESOLVED_DOUBTS_FILE)
+    return pd.DataFrame(columns=['Timestamp', 'Name', 'Phone', 'Doubt'])
+
+def resolve_doubt(timestamp):
+    try:
+        doubts_df = load_doubts()
+        resolved_df = load_resolved_doubts()
+        doubt_row = doubts_df[doubts_df['Timestamp'] == timestamp]
+        if not doubt_row.empty:
+            # Append to resolved
+            resolved_df = pd.concat([resolved_df, doubt_row], ignore_index=True)
+            resolved_df.to_csv(RESOLVED_DOUBTS_FILE, index=False)
+            # Remove from active
+            doubts_df = doubts_df[doubts_df['Timestamp'] != timestamp]
+            doubts_df.to_csv(DOUBTS_FILE, index=False)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Error resolving doubt: {e}")
+        return False
 
 init_doubts_csv()
 
@@ -63,15 +91,39 @@ with st.expander("🔐 TechLead/Techead Panel (Restricted)", expanded=False):
     if admin_input == ADMIN_PASSWORD:
         st.success("🛡️ Access granted. Viewing all submitted doubts.")
         doubts_df = load_doubts()
+        resolved_df = load_resolved_doubts()
         if not doubts_df.empty:
+            st.markdown("### 🟡 Active Doubts")
             for _, row in doubts_df.sort_values('Timestamp', ascending=False).iterrows():
                 with st.container():
                     st.markdown(f"**👤 {row['Name']}** | 📞 {row['Phone']}")
                     st.caption(f"🕒 {row['Timestamp']}")
                     st.markdown(f"**Doubt:** {row['Doubt']}")
+                    if st.button(f"✅ Mark as Resolved", key=f"resolve_{row['Timestamp']}"):
+                        if resolve_doubt(row['Timestamp']):
+                            st.success("Doubt marked as resolved!")
+                            st.experimental_rerun()
                 st.markdown("---")
         else:
-            st.info("No doubts submitted yet.")
+            st.info("No active doubts submitted yet.")
+        st.markdown("### 🟢 Resolved Doubts")
+        if not resolved_df.empty:
+            for _, row in resolved_df.sort_values('Timestamp', ascending=False).iterrows():
+                with st.container():
+                    st.markdown(f"**👤 {row['Name']}** | 📞 {row['Phone']}")
+                    st.caption(f"🕒 {row['Timestamp']}")
+                    st.markdown(f"**Doubt:** {row['Doubt']}")
+                st.markdown("---")
+            # Download button for resolved doubts
+            csv_data = resolved_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Resolved Doubts as CSV",
+                data=csv_data,
+                file_name=f"resolved_doubts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No doubts have been marked as resolved yet.")
     elif admin_input != "":
         st.error("❌ Incorrect password.")
 
