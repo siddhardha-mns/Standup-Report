@@ -20,16 +20,16 @@ ADMIN_PASSWORD = st.secrets.get("admin_password", "admin123")  # Default passwor
 
 # Team options
 TEAMS = [
-    "Team Alpha",
-    "Team Beta", 
-    "Team Gamma",
-    "Team Delta",
-    "Team Epsilon",
-    "Team Zeta",
-    "Team Eta",
-    "Team Theta",
-    "Team Iota",
-    "Team Kappa"
+    "Team 1",
+    "Team 2", 
+    "Team 3",
+    "Team 4",
+    "Team 5",
+    "Team 6",
+    "Team 7",
+    "Team 8",
+    "Team 9",
+    "Team 10"
 ]
 
 # -----------------------------
