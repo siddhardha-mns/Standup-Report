@@ -16,20 +16,20 @@ st.set_page_config(
 
 CSV_FILE = "standup_reports.csv"
 DOUBTS_FILE = "doubts.csv"
-ADMIN_PASSWORD = st.secrets.get("admin_password", "")
+ADMIN_PASSWORD = st.secrets.get("admin_password", "admin123")  # Default password for demo
 
 # Team options
 TEAMS = [
-    "Team 1",
-    "Team 2", 
-    "Team 3",
-    "Team 4",
-    "Team 5",
-    "Team 6",
-    "Team 7",
-    "Team 8",
-    "Team 9",
-    "Team 10"
+    "Team Alpha",
+    "Team Beta", 
+    "Team Gamma",
+    "Team Delta",
+    "Team Epsilon",
+    "Team Zeta",
+    "Team Eta",
+    "Team Theta",
+    "Team Iota",
+    "Team Kappa"
 ]
 
 # -----------------------------
@@ -120,33 +120,103 @@ def save_comment(timestamp, comment):
         st.error(f"Error saving comment: {e}")
         return False
 
+def get_user_reports(username):
+    """Get all reports for a specific user"""
+    reports_df = load_reports()
+    if reports_df.empty:
+        return pd.DataFrame()
+    
+    user_reports = reports_df[
+        reports_df['GitLab Username'].str.strip().str.lower() == username.lower()
+    ].sort_values('Timestamp', ascending=False)
+    
+    return user_reports
+
 # -----------------------------
 # Initialize
 # -----------------------------
 init_csv()
 
+# Initialize session state for admin access
+if 'is_admin' not in st.session_state:
+    st.session_state.is_admin = False
+
 # -----------------------------
-# TITLE
+# SIDEBAR
+# -----------------------------
+with st.sidebar:
+    st.markdown("# 📝 **Standup App**")
+    st.markdown("---")
+    
+    # Navigation
+    st.markdown("**Navigate:**")
+    st.markdown("- 📝 **Standup Reports** (Main)")
+    st.markdown("- ❓ **Intern Doubts & Queries**")
+    st.markdown("---")
+    
+    # Admin Panel in Sidebar
+    st.markdown("## 🔐 **Admin Panel**")
+    
+    if not st.session_state.is_admin:
+        admin_password = st.text_input("Admin Password", type="password", key="admin_login")
+        if st.button("🔓 Login as Admin"):
+            if admin_password == ADMIN_PASSWORD:
+                st.session_state.is_admin = True
+                st.success("✅ Admin access granted!")
+                st.rerun()
+            else:
+                st.error("❌ Incorrect password")
+    else:
+        st.success("🛡️ Admin Mode Active")
+        
+        if st.button("🔒 Logout Admin"):
+            st.session_state.is_admin = False
+            st.rerun()
+        
+        st.markdown("---")
+        
+        # Admin features
+        reports_df = load_reports()
+        
+        if not reports_df.empty:
+            # Download reports
+            csv_data = reports_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_data,
+                file_name=f"standup_reports_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+            
+            # Quick stats
+            st.markdown("### 📊 Quick Stats")
+            total_reports = len(reports_df)
+            today_reports = len(reports_df[reports_df['Date'] == datetime.now().strftime('%Y-%m-%d')])
+            unique_users = reports_df['GitLab Username'].nunique()
+            
+            st.metric("Total Reports", total_reports)
+            st.metric("Today's Reports", today_reports)
+            st.metric("Active Users", unique_users)
+            
+            # Clear all reports
+            st.markdown("---")
+            if st.button("🗑️ Clear All Reports", type="secondary"):
+                try:
+                    with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
+                        writer = csv.writer(file)
+                        writer.writerow(['Timestamp', 'Date', 'Team', 'GitLab Username', 'Standup Report', 'Comment'])
+                    st.success("✅ All reports cleared!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Failed to clear: {e}")
+
+# -----------------------------
+# MAIN CONTENT
 # -----------------------------
 st.title("📝 Matrusri Daily Standup Reports")
 st.markdown("---")
 
-# -----------------------------
-# SIDEBAR (Custom)
-# -----------------------------
-st.sidebar.markdown("""
-# 📝 **Standup App**
----
-**Navigate:**
-- 📝 **Standup Reports** (Home)
-- ❓ **Intern Doubts** (Sidebar → Intern Doubts & Queries)
-
----
-""")
-
-# -----------------------------
-# INSTRUCTIONS
-# -----------------------------
+# Instructions
 with st.expander("📋 Instructions for First-Time Users", expanded=False):
     st.markdown("""
     **How to use:**
@@ -154,13 +224,13 @@ with st.expander("📋 Instructions for First-Time Users", expanded=False):
     2. Enter your GitLab username
     3. Fill in your standup report (yesterday's tasks, today's tasks, blockers)
     4. Click Submit (Note: You can only submit **one report per day**)
-    5. View all reports below
+    5. View your previous reports below
     
-    **Important:** Each user can only submit one standup report per day. If you need to make changes, please contact an admin.
+    **Privacy Note:** You can only see your own standup reports. All reports are available to admins for review and feedback.
     """)
 
 # -----------------------------
-# FORM
+# FORM SECTION
 # -----------------------------
 st.header("📤 Submit Your Daily Standup Report")
 
@@ -185,7 +255,7 @@ else:
 report_text = st.text_area(
     "Daily Standup Report *",
     height=150,
-    placeholder="Yesterday: ...\nToday: ...\nBlockers: ...",
+    placeholder="Yesterday: What did I accomplish?\nToday: What will I work on?\nBlockers: What obstacles are impeding my progress?",
     disabled=report_disabled
 )
 
@@ -207,45 +277,76 @@ if submit_button:
 st.markdown("---")
 
 # -----------------------------
-# VIEW REPORTS
+# USER'S REPORTS SECTION (Non-Admin View)
 # -----------------------------
-st.header("📊 All Submitted Reports")
-
-reports_df = load_reports()
-
-if not reports_df.empty:
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-    with col1:
-        search_username = st.text_input("🔍 Filter by username", placeholder="e.g. johndoe")
-    with col2:
-        team_filter = st.selectbox("🏷️ Filter by team", ["All Teams"] + TEAMS)
-    with col3:
-        sort_order = st.selectbox("📅 Sort by", ["Newest First", "Oldest First"])
-    with col4:
-        show_count = st.selectbox("📄 Show entries", [10, 25, 50, "All"])
-
-    filtered_df = reports_df.copy()
+if not st.session_state.is_admin:
+    st.header("📋 Your Previous Reports")
     
-    # Apply username filter
-    if search_username:
-        filtered_df = filtered_df[filtered_df['GitLab Username'].str.contains(search_username, case=False, na=False)]
-    
-    # Apply team filter
-    if team_filter != "All Teams":
-        filtered_df = filtered_df[filtered_df['Team'] == team_filter]
-
-    if sort_order == "Newest First":
-        filtered_df = filtered_df.sort_values('Timestamp', ascending=False)
+    if username.strip():
+        user_reports = get_user_reports(username.strip())
+        
+        if not user_reports.empty:
+            st.info(f"📈 Showing {len(user_reports)} reports for {username}")
+            
+            for _, row in user_reports.iterrows():
+                with st.container():
+                    col1, col2 = st.columns([1, 4])
+                    with col1:
+                        st.markdown(f"**🏷️ {row.get('Team', 'Not Specified')}**")
+                        st.caption(f"🕒 {row['Timestamp']}")
+                    with col2:
+                        st.markdown("**Your Report:**")
+                        st.write(row['Standup Report'])
+                        if row.get('Comment', '') and row.get('Comment', '') != 'Check back later to view comment 📝':
+                            st.markdown(f"**💬 Admin Feedback:** {row['Comment']}")
+                        else:
+                            st.caption("⏳ Waiting for admin feedback...")
+                st.markdown("---")
+        else:
+            st.info("📭 No previous reports found. Submit your first report above!")
     else:
-        filtered_df = filtered_df.sort_values('Timestamp', ascending=True)
+        st.info("👆 Enter your GitLab username above to view your previous reports.")
 
-    if show_count != "All":
-        filtered_df = filtered_df.head(int(show_count))
-
-    st.info(f"📈 Showing {len(filtered_df)} of {len(reports_df)} total reports")
-
-    # Display team statistics
+# -----------------------------
+# ADMIN VIEW - ALL REPORTS
+# -----------------------------
+elif st.session_state.is_admin:
+    st.header("🛡️ Admin View - All Submitted Reports")
+    
+    reports_df = load_reports()
+    
     if not reports_df.empty:
+        # Filters for admin
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+        with col1:
+            search_username = st.text_input("🔍 Filter by username", placeholder="e.g. johndoe")
+        with col2:
+            team_filter = st.selectbox("🏷️ Filter by team", ["All Teams"] + TEAMS)
+        with col3:
+            sort_order = st.selectbox("📅 Sort by", ["Newest First", "Oldest First"])
+        with col4:
+            show_count = st.selectbox("📄 Show entries", [10, 25, 50, "All"])
+
+        filtered_df = reports_df.copy()
+        
+        # Apply filters
+        if search_username:
+            filtered_df = filtered_df[filtered_df['GitLab Username'].str.contains(search_username, case=False, na=False)]
+        
+        if team_filter != "All Teams":
+            filtered_df = filtered_df[filtered_df['Team'] == team_filter]
+
+        if sort_order == "Newest First":
+            filtered_df = filtered_df.sort_values('Timestamp', ascending=False)
+        else:
+            filtered_df = filtered_df.sort_values('Timestamp', ascending=True)
+
+        if show_count != "All":
+            filtered_df = filtered_df.head(int(show_count))
+
+        st.info(f"📈 Showing {len(filtered_df)} of {len(reports_df)} total reports")
+
+        # Team Statistics
         st.subheader("📊 Team Statistics")
         team_counts = reports_df['Team'].value_counts()
         col1, col2 = st.columns([2, 1])
@@ -256,105 +357,37 @@ if not reports_df.empty:
             for team, count in team_counts.items():
                 st.write(f"• {team}: {count}")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    for _, row in filtered_df.iterrows():
-        with st.container():
-            c1, c2 = st.columns([1, 4])
-            with c1:
-                st.markdown(f"**👤 {row['GitLab Username']}**")
-                st.markdown(f"**🏷️ {row.get('Team', 'Not Specified')}**")
-                st.caption(f"🕒 {row['Timestamp']}")
-            with c2:
+        # Display reports with comment functionality
+        st.subheader("📝 Reports & Comments")
+        
+        for _, row in filtered_df.iterrows():
+            with st.expander(f"👤 {row['GitLab Username']} ({row.get('Team', 'Not Specified')}) - {row['Timestamp']}"):
                 st.markdown("**Report:**")
                 st.write(row['Standup Report'])
-                if row.get('Comment', ''):
-                    st.markdown(f"**💬 Admin Comment:** {row['Comment']}")
-        st.markdown("---")
-else:
-    st.info("📭 No reports submitted yet.")
-
-# -----------------------------
-# ADMIN PANEL
-# -----------------------------
-with st.expander("🔐 Admin Panel (Restricted)", expanded=False):
-    admin_input = st.text_input("Enter Admin Password", type="password")
-    if admin_input == ADMIN_PASSWORD:
-        st.success("🛡️ Access granted.")
-
-        csv_data = reports_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download All Reports as CSV",
-            data=csv_data,
-            file_name=f"standup_reports_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-
-        st.markdown("### 📊 Daily Submission Stats")
-        if not reports_df.empty:
-            try:
-                # Safely convert Date column for stats
-                def safe_date_convert(date_val):
-                    try:
-                        if pd.isna(date_val):
-                            return None
-                        if isinstance(date_val, datetime.date):
-                            return date_val
-                        return pd.to_datetime(str(date_val)).date()
-                    except:
-                        return None
                 
-                reports_df['Date_parsed'] = reports_df['Date'].apply(safe_date_convert)
-                today = datetime.now().date()
+                st.markdown("**Admin Comment:**")
+                comment_key = f"comment_{row['Timestamp']}"
+                current_comment = row.get('Comment', '')
+                if current_comment == 'Check back later to view comment 📝':
+                    current_comment = ''
                 
-                today_reports = reports_df[reports_df['Date_parsed'] == today]
-                st.metric("Reports Submitted Today", len(today_reports))
+                new_comment = st.text_area(
+                    "Add/Edit Comment", 
+                    value=current_comment, 
+                    key=comment_key,
+                    height=100
+                )
                 
-                # Team-wise breakdown for today
-                if not today_reports.empty:
-                    st.markdown("**Today's Submissions by Team:**")
-                    today_team_counts = today_reports['Team'].value_counts()
-                    for team, count in today_team_counts.items():
-                        st.write(f"• {team}: {count}")
-                    
-                    st.markdown("**Today's Individual Submissions:**")
-                    for _, row in today_reports.iterrows():
-                        st.write(f"- {row['GitLab Username']} ({row['Team']}) at {row['Timestamp']}")
-            except Exception as e:
-                st.warning("Could not load daily stats due to date parsing issues.")
-
-        st.markdown("### 📝 Add/Edit Comments to Reports")
-        if not reports_df.empty:
-            # Add team filter for admin comments
-            admin_team_filter = st.selectbox("Filter by team for comments", ["All Teams"] + TEAMS, key="admin_team_filter")
-            admin_filtered_df = reports_df.copy()
-            if admin_team_filter != "All Teams":
-                admin_filtered_df = admin_filtered_df[admin_filtered_df['Team'] == admin_team_filter]
-            
-            for idx, row in admin_filtered_df.iterrows():
-                with st.expander(f"{row['GitLab Username']} ({row.get('Team', 'Not Specified')}) at {row['Timestamp']}"):
-                    st.write(row['Standup Report'])
-                    comment = st.text_area(f"Admin Comment for {row['GitLab Username']} ({row['Timestamp']})", value=row.get('Comment', ''), key=f"comment_{row['Timestamp']}")
-                    if st.button(f"Save Comment", key=f"save_{row['Timestamp']}"):
-                        if save_comment(row['Timestamp'], comment):
-                            st.success("Comment saved!")
-                            st.rerun()
-
-        st.markdown("### ⚠️ Clear All Reports")
-        if st.button("🗑️ Clear All Reports", type="secondary"):
-            try:
-                # Reinitialize the CSV with just headers (including Team column)
-                with open(CSV_FILE, 'w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(['Timestamp', 'Date', 'Team', 'GitLab Username', 'Standup Report', 'Comment'])
-                st.success("✅ All reports have been cleared.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Failed to clear reports: {e}")
-
-    elif admin_input != "":
-        st.error("❌ Incorrect password.")
-
+                if st.button(f"💾 Save Comment", key=f"save_{row['Timestamp']}"):
+                    if save_comment(row['Timestamp'], new_comment):
+                        st.success("✅ Comment saved!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to save comment")
+    else:
+        st.info("📭 No reports submitted yet.")
 
 # -----------------------------
 # FOOTER
